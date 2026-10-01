@@ -97,6 +97,41 @@
     .resumo-card .ref dt, .resumo-card .ref dd { color: #ff6b6b; }
     .resumo-card .tot dt { color: var(--texto); font-weight: 600; }
 
+    /* ---------- Parecer (texto de defesa) ---------- */
+    :root { --laranja: #f57c00; }
+    .parecer { margin-bottom: 18px; }
+    .parecer-texto {
+      margin: 14px 0 10px;
+      background: var(--azul-escuro);
+      border: 1.5px solid var(--linha);
+      border-left: 4px solid var(--verde);
+      border-radius: 10px;
+      padding: 14px 16px;
+      font-size: 0.93rem;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+    .parecer-aviso { margin: 0 0 10px; color: #ffb24d; font-size: 0.85rem; }
+    .btn-sec {
+      width: 100%;
+      background: transparent;
+      color: var(--verde);
+      border: 1.5px solid var(--verde);
+      border-radius: 10px;
+      padding: 12px 16px;
+      font: inherit; font-weight: 700; font-size: 0.95rem;
+      cursor: pointer;
+    }
+    .btn-sec:hover { background: rgba(70, 218, 134, 0.12); }
+    .btn-sec:active { transform: translateY(1px); }
+
+    /* Campos obrigatórios vazios */
+    .campo.vazio {
+      background: #fff0dc;
+      box-shadow: inset 5px 0 0 var(--laranja);
+    }
+    .campo.vazio label::after { content: ' *'; color: var(--laranja); }
+
     /* ---------- Formulário (papel) ---------- */
     #formulario { margin-top: 26px; }
     .folha {
@@ -194,6 +229,23 @@
     <section id="formulario" hidden>
       <div class="resumo" id="resumo" aria-label="Resumo dos apontamentos"></div>
 
+      <div class="parecer">
+        <label class="sel-label" for="selParecer">Parecer</label>
+        <div class="select-box">
+          <select id="selParecer">
+            <option value="">Selecione uma opção</option>
+            <option value="manter">Manter cadastro</option>
+            <option value="valor">Descredenciamento por elevado valor de restritivos</option>
+            <option value="desinteresse">Descredenciamento por desinteresse comercial e restrição</option>
+          </select>
+        </div>
+        <div id="parecerBox" hidden>
+          <p class="parecer-texto" id="parecerTexto"></p>
+          <p class="parecer-aviso" id="parecerAviso" hidden></p>
+          <button id="btnCopiarRec" type="button" class="btn-sec">Copiar para o campo recomendação</button>
+        </div>
+      </div>
+
       <div class="folha">
         <h2 class="folha-titulo"><span>FORMULÁRIO PARA MANUTENÇÃO DA PARCERIA</span></h2>
 
@@ -201,7 +253,7 @@
         <div class="campo"><label for="fDn">Nº do DN:</label><input id="fDn" type="text" autocomplete="off"></div>
         <div class="campo"><label for="fCnpj">CNPJ:</label><input id="fCnpj" type="text" autocomplete="off"></div>
         <div class="campo"><label for="fGcm">GCM:</label><input id="fGcm" type="text" autocomplete="off"></div>
-        <div class="campo">
+        <div class="campo obrig">
           <label for="fTipo">Tipo de parceiros (Lojas ou Concessionárias):</label>
           <select id="fTipo">
             <option value="">Selecione</option>
@@ -209,12 +261,12 @@
             <option value="Concessionária">Concessionária</option>
           </select>
         </div>
-        <div class="campo"><label for="fFundacao">Data de fundação da empresa:</label><input id="fFundacao" type="date"></div>
+        <div class="campo obrig"><label for="fFundacao">Data de fundação da empresa:</label><input id="fFundacao" type="date"></div>
         <div class="campo"><label for="fNomeacao">Data da nomeação:</label><input id="fNomeacao" type="text" autocomplete="off"></div>
         <div class="campo"><label for="fMedia">Média de contratos em quantidade dos últimos 6 meses:</label><input id="fMedia" type="text" autocomplete="off"></div>
         <div class="campo"><label for="fRestEmpresa">Valor das restrições da empresa:</label><input id="fRestEmpresa" type="text" autocomplete="off"></div>
         <div class="campo"><label for="fRestSocios">Valor das restrições do(s) sócio(s):</label><input id="fRestSocios" type="text" autocomplete="off"></div>
-        <div class="campo recomendacao"><label for="fRecomendacao">RECOMENDAÇÃO:</label><textarea id="fRecomendacao"></textarea></div>
+        <div class="campo recomendacao obrig"><label for="fRecomendacao">RECOMENDAÇÃO:</label><textarea id="fRecomendacao"></textarea></div>
       </div>
 
       <div class="acoes">
@@ -461,6 +513,120 @@
       });
     }
 
+    // ---------- Parecer (texto de defesa) ----------
+    const selParecer = document.getElementById('selParecer');
+    const parecerBox = document.getElementById('parecerBox');
+    const parecerTexto = document.getElementById('parecerTexto');
+    const parecerAviso = document.getElementById('parecerAviso');
+    let lojaAtual = null;
+
+    // true se o texto da célula tem um valor diferente de zero (ex.: "R$ 1.234,00")
+    function temValor(v) {
+      if (!v) return false;
+      const n = parseFloat(String(v).replace(/[^0-9,.-]/g, '').replace(/\./g, '').replace(',', '.'));
+      return isFinite(n) && n !== 0;
+    }
+
+    // "5 anos e 3 meses" a partir de uma data AAAA-MM-DD
+    function tempoDesde(iso) {
+      const p = (iso || '').split('-');
+      if (p.length !== 3) return '';
+      const ini = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+      const hoje = new Date();
+      let meses = (hoje.getFullYear() - ini.getFullYear()) * 12 + (hoje.getMonth() - ini.getMonth());
+      if (hoje.getDate() < ini.getDate()) meses--;
+      if (meses < 0) return '';
+      const a = Math.floor(meses / 12), m = meses % 12;
+      const partes = [];
+      if (a > 0) partes.push(a + (a === 1 ? ' ano' : ' anos'));
+      if (m > 0) partes.push(m + (m === 1 ? ' mês' : ' meses'));
+      return partes.length ? partes.join(' e ') : 'menos de 1 mês';
+    }
+
+    function juntar(itens) {
+      if (itens.length <= 1) return itens.join('');
+      return itens.slice(0, -1).join(', ') + ' e ' + itens[itens.length - 1];
+    }
+
+    function gerarParecer(opcao) {
+      if (opcao === 'valor') {
+        return { texto: 'Solicito o descredenciamento por elevado valor de restrições.', aviso: '' };
+      }
+      if (opcao === 'desinteresse') {
+        return {
+          texto: 'Solicito o descredenciamento por desinteresse comercial. A loja não possui produção, ou a produção é muito baixa, e há restritivos no CNPJ.',
+          aviso: ''
+        };
+      }
+
+      // ----- Manter cadastro -----
+      const l = lojaAtual;
+      const frases = [];
+      frases.push(temValor(l.total)
+        ? 'Solicito manter o cadastro da DN ativo, pois a loja possui ' + l.total + ' em apontamentos.'
+        : 'Solicito manter o cadastro da DN ativo, pois a loja possui apontamentos.');
+
+      if (temValor(l.protesto)) {
+        frases.push('Os protestos referem-se ao IPVA de veículos que não foram transferidos; os clientes foram multados e não efetuaram o pagamento.');
+      }
+      const tipos = [];
+      if (temValor(l.refin) || temValor(l.socioRefin)) tipos.push('Refin');
+      if (temValor(l.pefin) || temValor(l.socioPefin)) tipos.push('Pefin');
+      if (tipos.length) {
+        frases.push('Os apontamentos de ' + tipos.join('/') + ' estão em negociação e serão regularizados.');
+      }
+
+      const tempo = tempoDesde(document.getElementById('fFundacao').value);
+      const media = document.getElementById('fMedia').value.trim();
+      const nomeacao = document.getElementById('fNomeacao').value.trim();
+      const relato = [];
+      if (tempo) relato.push('possui ' + tempo + ' de CNPJ');
+      if (media) relato.push('produziu em 2026 a quantidade de ' + media + ' contratos');
+      if (nomeacao) relato.push('está cadastrada no banco desde ' + nomeacao);
+      if (relato.length) frases.push('A loja ' + juntar(relato) + '.');
+
+      return {
+        texto: frases.join(' '),
+        aviso: tempo ? '' : 'Preencha a data de fundação para incluir o tempo de CNPJ no texto.'
+      };
+    }
+
+    function atualizarParecer() {
+      const opcao = selParecer.value;
+      if (!opcao || !lojaAtual) { parecerBox.hidden = true; return; }
+      const r = gerarParecer(opcao);
+      parecerTexto.textContent = r.texto;
+      parecerAviso.textContent = r.aviso;
+      parecerAviso.hidden = !r.aviso;
+      parecerBox.hidden = false;
+    }
+
+    selParecer.addEventListener('change', atualizarParecer);
+    ['fFundacao', 'fMedia', 'fNomeacao'].forEach(id =>
+      document.getElementById(id).addEventListener('input', atualizarParecer));
+
+    document.getElementById('btnCopiarRec').addEventListener('click', () => {
+      const rec = document.getElementById('fRecomendacao');
+      rec.value = parecerTexto.textContent;
+      atualizarObrigatorios();
+      rec.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      rec.focus();
+      mostrarToast('Texto copiado para o campo Recomendação.');
+    });
+
+    // ---------- Campos obrigatórios (laranja quando vazios) ----------
+    function atualizarObrigatorios() {
+      document.querySelectorAll('.campo.obrig').forEach(c => {
+        const el = c.querySelector('input, select, textarea');
+        c.classList.toggle('vazio', !el.value.trim());
+      });
+    }
+    ['fTipo', 'fFundacao', 'fRecomendacao'].forEach(id => {
+      const el = document.getElementById(id);
+      el.addEventListener('input', atualizarObrigatorios);
+      el.addEventListener('change', atualizarObrigatorios);
+    });
+
     function set(id, valor) { document.getElementById(id).value = valor || ''; }
 
     function preencher(l) {
@@ -476,6 +642,10 @@
       set('fRestSocios', l.restSocios);
       set('fRecomendacao', '');
       renderResumo(l);
+      lojaAtual = l;
+      selParecer.value = '';
+      parecerBox.hidden = true;
+      atualizarObrigatorios();
       formulario.hidden = false;
       formulario.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
