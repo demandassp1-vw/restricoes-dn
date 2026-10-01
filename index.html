@@ -97,6 +97,15 @@
     .resumo-card .ref dt, .resumo-card .ref dd { color: #ff6b6b; }
     .resumo-card .tot dt { color: var(--texto); font-weight: 600; }
 
+    /* ---------- Lojas já tratadas ---------- */
+    .select-box option.tratada { color: #46da86; font-weight: 600; }
+    .envio-status { margin: 12px 0 0; font-size: 0.88rem; color: var(--verde); }
+    .envio-status .link {
+      background: none; border: 0; padding: 0 0 0 6px;
+      color: var(--texto-suave); text-decoration: underline;
+      font: inherit; cursor: pointer;
+    }
+
     /* ---------- Parecer (texto de defesa) ---------- */
     :root { --laranja: #f57c00; }
     .parecer { margin-bottom: 18px; }
@@ -274,6 +283,9 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 5a1 1 0 0 1 1-1h18a1 1 0 0 1 1 1v.4l-10 6.2L2 5.4V5zm0 2.8V19a1 1 0 0 0 1 1h18a1 1 0 0 0 1-1V7.8l-10 6.2L2 7.8z"/></svg>
           Enviar por e-mail
         </button>
+        <p class="envio-status" id="envioStatus" hidden>
+          <span id="envioTexto"></span><button type="button" class="link" id="btnDesmarcar">Desmarcar</button>
+        </p>
       </div>
     </section>
   </main>
@@ -428,6 +440,69 @@
       if (e.filename && e.filename.indexOf('docs.google.com') !== -1) falhaCarga();
     });
 
+    // ---------- Lojas já tratadas (guardado no navegador) ----------
+    const CHAVE_STORAGE = 'apontamentosDN_enviadas';
+
+    function enviadas() {
+      try { return JSON.parse(localStorage.getItem(CHAVE_STORAGE)) || {}; } catch (e) { return {}; }
+    }
+    function salvarEnviadas(o) {
+      try { localStorage.setItem(CHAVE_STORAGE, JSON.stringify(o)); } catch (e) { /* sem armazenamento */ }
+    }
+    function chave(l) {
+      const k = (l.dn || '') + '|' + (l.cnpj || '');
+      return k === '|' ? l.razao : k;
+    }
+
+    function aplicarMarca(o, l) {
+      const ok = !!enviadas()[chave(l)];
+      o.classList.toggle('tratada', ok);
+      o.textContent = (ok ? '✓ ' : '') + o.dataset.rotulo;
+    }
+
+    function atualizarContagem() {
+      const ops = Array.from(selLoja.options).slice(1);
+      const n = ops.filter(o => o.classList.contains('tratada')).length;
+      selLoja.options[0].textContent = 'Selecione a loja (' + ops.length +
+        (n ? ' · ' + n + (n === 1 ? ' enviada' : ' enviadas') : '') + ')';
+    }
+
+    function opcaoDaLoja(l) {
+      return Array.from(selLoja.options).find(o => o.value === String(lojas.indexOf(l)));
+    }
+
+    function atualizarStatusEnvio() {
+      const box = document.getElementById('envioStatus');
+      const dados = lojaAtual ? enviadas()[chave(lojaAtual)] : null;
+      if (!dados) { box.hidden = true; return; }
+      const d = new Date(dados);
+      const quando = isNaN(d) ? '' : ' em ' + d.toLocaleDateString('pt-BR') + ' às ' +
+        d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+      document.getElementById('envioTexto').textContent = '✓ E-mail enviado' + quando + '.';
+      box.hidden = false;
+    }
+
+    function marcarEnviada(l) {
+      const o = enviadas();
+      o[chave(l)] = new Date().toISOString();
+      salvarEnviadas(o);
+      const op = opcaoDaLoja(l);
+      if (op) aplicarMarca(op, l);
+      atualizarContagem();
+      atualizarStatusEnvio();
+    }
+
+    document.getElementById('btnDesmarcar').addEventListener('click', () => {
+      if (!lojaAtual) return;
+      const o = enviadas();
+      delete o[chave(lojaAtual)];
+      salvarEnviadas(o);
+      const op = opcaoDaLoja(lojaAtual);
+      if (op) aplicarMarca(op, lojaAtual);
+      atualizarContagem();
+      atualizarStatusEnvio();
+    });
+
     // ---------- Seleção de GCM e Loja ----------
     selGcm.addEventListener('change', () => {
       formulario.hidden = true;
@@ -452,9 +527,11 @@
       doGcm.forEach(x => {
         const o = document.createElement('option');
         o.value = String(x.i);
-        o.textContent = cont[x.l.razao] > 1 && x.l.cnpj ? x.l.razao + ' – ' + x.l.cnpj : x.l.razao;
+        o.dataset.rotulo = cont[x.l.razao] > 1 && x.l.cnpj ? x.l.razao + ' – ' + x.l.cnpj : x.l.razao;
+        aplicarMarca(o, x.l);
         selLoja.appendChild(o);
       });
+      atualizarContagem();
       selLoja.disabled = false;
     });
 
@@ -646,6 +723,7 @@
       selParecer.value = '';
       parecerBox.hidden = true;
       atualizarObrigatorios();
+      atualizarStatusEnvio();
       formulario.hidden = false;
       formulario.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
@@ -722,6 +800,8 @@
       const corpo = 'Prezado Gestor,\n\nSegue abaixo o parecer sobre a loja com apontamentos restritivos.\n\n';
       window.location.href = 'mailto:?subject=' + encodeURIComponent(assunto) +
                              '&body=' + encodeURIComponent(corpo);
+
+      if (ok && lojaAtual) marcarEnviada(lojaAtual);
 
       mostrarToast(ok
         ? 'Tabela copiada! No e-mail que abriu, cole (Ctrl+V) abaixo do texto.'
