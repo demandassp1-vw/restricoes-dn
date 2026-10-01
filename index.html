@@ -1,4 +1,4 @@
-<!<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8">
@@ -94,6 +94,8 @@
     }
     .resumo-card dt { color: var(--texto-suave); margin: 0; }
     .resumo-card dd { margin: 0; font-weight: 600; text-align: right; }
+    .resumo-card .ref dt, .resumo-card .ref dd { color: #ff6b6b; }
+    .resumo-card .tot dt { color: var(--texto); font-weight: 600; }
 
     /* ---------- Formulário (papel) ---------- */
     #formulario { margin-top: 26px; }
@@ -190,22 +192,7 @@
     <p id="estado" role="status"></p>
 
     <section id="formulario" hidden>
-      <div class="resumo" aria-label="Resumo dos apontamentos">
-        <div class="resumo-card">
-          <h3>Apontamentos DN</h3>
-          <dl>
-            <div><dt>Vl. Refin</dt><dd id="rRefin">—</dd></div>
-            <div><dt>Vl. Pefin</dt><dd id="rPefin">—</dd></div>
-          </dl>
-        </div>
-        <div class="resumo-card">
-          <h3>Apontamentos Sócio</h3>
-          <dl>
-            <div><dt>Sócio Refin</dt><dd id="rSocioRefin">—</dd></div>
-            <div><dt>Sócio Pefin</dt><dd id="rSocioPefin">—</dd></div>
-          </dl>
-        </div>
-      </div>
+      <div class="resumo" id="resumo" aria-label="Resumo dos apontamentos"></div>
 
       <div class="folha">
         <h2 class="folha-titulo"><span>FORMULÁRIO PARA MANUTENÇÃO DA PARCERIA</span></h2>
@@ -259,7 +246,14 @@
       refin: 15,        // P  (Vl. Refin)
       pefin: 16,        // Q  (Vl. Pefin)
       socioRefin: 19,   // T  (Sócio Refin)
-      socioPefin: 20    // U  (Sócio Pefin)
+      socioPefin: 20,   // U  (Sócio Pefin)
+      restricao: 12,    // M  (Restrição)
+      protesto: 13,     // N  (Vl. Protesto)
+      acoes: 14,        // O  (Vl. Ações)
+      qtdeVencidas: 17, // R  (Qtde. Dívidas Vencidas)
+      totalRefin: 22,   // W  (Valor Total Refin)
+      totalPefin: 23,   // X  (Valor Total Pefin)
+      total: 24         // Y  (Valor Total)
     };
     // ===================================================
 
@@ -344,7 +338,14 @@
           refin: celula(r.c, COL.refin),
           pefin: celula(r.c, COL.pefin),
           socioRefin: celula(r.c, COL.socioRefin),
-          socioPefin: celula(r.c, COL.socioPefin)
+          socioPefin: celula(r.c, COL.socioPefin),
+          restricao: celula(r.c, COL.restricao),
+          protesto: celula(r.c, COL.protesto),
+          acoes: celula(r.c, COL.acoes),
+          qtdeVencidas: celula(r.c, COL.qtdeVencidas),
+          totalRefin: celula(r.c, COL.totalRefin),
+          totalPefin: celula(r.c, COL.totalPefin),
+          total: celula(r.c, COL.total)
         }))
         .filter(l => l.gcm && l.razao);
 
@@ -410,470 +411,55 @@
       preencher(lojas[Number(selLoja.value)]);
     });
 
-    function set(id, valor) { document.getElementById(id).value = valor || ''; }
-
-    function preencher(l) {
-      set('fRazao', l.razao);
-      set('fDn', l.dn);
-      set('fCnpj', l.cnpj);
-      set('fGcm', l.gcm);
-      set('fTipo', '');
-      set('fFundacao', '');
-      set('fNomeacao', l.nomeacao);
-      set('fMedia', l.media);
-      set('fRestEmpresa', l.restEmpresa);
-      set('fRestSocios', l.restSocios);
-      set('fRecomendacao', '');
-      document.getElementById('rRefin').textContent = l.refin || '—';
-      document.getElementById('rPefin').textContent = l.pefin || '—';
-      document.getElementById('rSocioRefin').textContent = l.socioRefin || '—';
-      document.getElementById('rSocioPefin').textContent = l.socioPefin || '—';
-      formulario.hidden = false;
-      formulario.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-
-    // ---------- E-mail ----------
-    function esc(t) {
-      return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-    }
-
-    function valorCampo(id) {
-      const v = document.getElementById(id).value.trim();
-      if (id === 'fFundacao' && v) {
-        const p = v.split('-');
-        if (p.length === 3) return p[2] + '/' + p[1] + '/' + p[0];
-      }
-      return v || '—';
-    }
-
-    // Tabela em HTML com estilos inline (compatível com Outlook, Gmail etc.)
-    function montarHtml() {
-      const cel = 'border:1px solid #000000;padding:12px 14px;font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#000000;';
-      let h = '<table cellpadding="0" cellspacing="0" style="border-collapse:collapse;width:100%;max-width:650px;border:1px solid #000000;">';
-      h += '<tr><td style="' + cel + 'text-align:center;font-weight:bold;text-decoration:underline;">FORMULÁRIO PARA MANUTENÇÃO DA PARCERIA</td></tr>';
-      CAMPOS.forEach(([rotulo, id]) => {
-        h += '<tr><td style="' + cel + '"><b>' + esc(rotulo) + '</b> ' +
-             esc(valorCampo(id)).replace(/\n/g, '<br>') + '</td></tr>';
-      });
-      return h + '</table>';
-    }
-
-    function montarTextoPlano() {
-      const linhas = ['FORMULÁRIO PARA MANUTENÇÃO DA PARCERIA', ''];
-      CAMPOS.forEach(([rotulo, id]) => linhas.push(rotulo + ' ' + valorCampo(id)));
-      return linhas.join('\n');
-    }
-
-    async function copiarHtml(html, texto) {
-      try {
-        if (window.ClipboardItem && navigator.clipboard && navigator.clipboard.write) {
-          await navigator.clipboard.write([new ClipboardItem({
-            'text/html': new Blob([html], { type: 'text/html' }),
-            'text/plain': new Blob([texto], { type: 'text/plain' })
-          })]);
-          return true;
-        }
-      } catch (e) { /* cai no plano B */ }
-
-      // Plano B: seleciona a tabela renderizada e copia
-      const box = document.createElement('div');
-      box.innerHTML = html;
-      box.style.position = 'fixed';
-      box.style.left = '-9999px';
-      box.style.top = '0';
-      document.body.appendChild(box);
-      const range = document.createRange();
-      range.selectNodeContents(box);
-      const sel = window.getSelection();
-      sel.removeAllRanges();
-      sel.addRange(range);
-      let ok = false;
-      try { ok = document.execCommand('copy'); } catch (_) {}
-      sel.removeAllRanges();
-      box.remove();
-      return ok;
-    }
-
-    document.getElementById('btnEmail').addEventListener('click', async () => {
-      const razao = document.getElementById('fRazao').value.trim();
-      const ok = await copiarHtml(montarHtml(), montarTextoPlano());
-
-      const dn = document.getElementById('fDn').value.trim();
-      const assunto = 'MONITORAMENTO SERASA - REGIONAL | DN ' + dn + ' | ' + razao;
-      const corpo = 'Prezado Gestor,\n\nSegue abaixo o parecer sobre a loja com apontamentos restritivos.\n\n';
-      window.location.href = 'mailto:?subject=' + encodeURIComponent(assunto) +
-                             '&body=' + encodeURIComponent(corpo);
-
-      mostrarToast(ok
-        ? 'Tabela copiada! No e-mail que abriu, cole (Ctrl+V) abaixo do texto.'
-        : 'Não consegui copiar a tabela automaticamente. Tente novamente.');
-    });
-
-    carregarPlanilha();
-  </script>
-</body>
-</html> html>
-<html lang="pt-BR">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Apontamentos DN</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&display=swap" rel="stylesheet">
-  <style>
-    :root {
-      --verde: #46da86;
-      --azul: #111741;
-      --azul-escuro: #142037;
-      --texto: #eef1fb;
-      --texto-suave: #9aa3c7;
-      --linha: rgba(255, 255, 255, 0.10);
-      --tinta: #111111;
-    }
-    * { box-sizing: border-box; }
-    html, body { margin: 0; }
-    body {
-      background: var(--azul);
-      color: var(--texto);
-      font-family: 'Sora', system-ui, -apple-system, 'Segoe UI', sans-serif;
-      line-height: 1.5;
-      min-height: 100vh;
-      padding-bottom: 48px;
-    }
-    header {
-      background: var(--azul-escuro);
-      border-bottom: 3px solid var(--verde);
-      padding: 22px 20px 20px;
-    }
-    .wrap { max-width: 760px; margin: 0 auto; }
-    h1 { margin: 0; font-size: 1.35rem; font-weight: 700; letter-spacing: -0.01em; }
-
-    main { padding: 22px 20px; }
-    .seletores { display: grid; gap: 16px; grid-template-columns: 1fr 1fr; }
-    @media (max-width: 620px) { .seletores { grid-template-columns: 1fr; } }
-    label.sel-label { display: block; font-weight: 600; font-size: 0.95rem; margin-bottom: 8px; }
-    .select-box { position: relative; }
-    .select-box select {
-      width: 100%;
-      appearance: none; -webkit-appearance: none;
-      background: var(--azul-escuro);
-      color: var(--texto);
-      border: 1.5px solid var(--linha);
-      border-radius: 10px;
-      padding: 14px 44px 14px 14px;
-      font: inherit; font-size: 1rem;
-    }
-    .select-box select:disabled { opacity: 0.55; }
-    .select-box::after {
-      content: '';
-      position: absolute; right: 18px; top: 50%;
-      width: 8px; height: 8px;
-      border-right: 2px solid var(--verde);
-      border-bottom: 2px solid var(--verde);
-      transform: translateY(-70%) rotate(45deg);
-      pointer-events: none;
-    }
-    .select-box option { background: var(--azul-escuro); }
-    select:focus-visible, button:focus-visible {
-      outline: 3px solid var(--verde);
-      outline-offset: 2px;
-    }
-
-    #estado { margin: 22px 0 0; color: var(--texto-suave); font-size: 0.95rem; }
-    #estado.erro { color: #ff9b9b; }
-    #estado.erro small { display: block; margin-top: 6px; color: var(--texto-suave); }
-
-    /* ---------- Formulário (papel) ---------- */
-    #formulario { margin-top: 26px; }
-    .folha {
-      background: #ffffff;
-      color: var(--tinta);
-      border: 1.5px solid var(--tinta);
-      font-family: Arial, Helvetica, sans-serif;
-    }
-    .folha-titulo {
-      margin: 0;
-      padding: 16px 12px;
-      text-align: center;
-      font-size: 1rem;
-      font-weight: 700;
-      border-bottom: 1.5px solid var(--tinta);
-    }
-    .folha-titulo span { text-decoration: underline; text-underline-offset: 3px; }
-    .campo {
-      display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px;
-      padding: 0 18px;
-      min-height: 54px;
-      border-bottom: 1.5px solid var(--tinta);
-    }
-    .campo:last-child { border-bottom: 0; }
-    .campo label { font-weight: 700; font-size: 0.98rem; padding: 12px 0; }
-    .campo input, .campo select, .campo textarea {
-      flex: 1 1 200px;
-      min-width: 0;
-      border: 0;
-      background: transparent;
-      color: var(--tinta);
-      font: inherit; font-size: 0.98rem;
-      padding: 10px 6px;
-      border-radius: 4px;
-    }
-    .campo input:focus, .campo select:focus, .campo textarea:focus {
-      outline: 2px solid var(--verde);
-      background: #eefbf3;
-    }
-    .campo.recomendacao { align-items: flex-start; min-height: 110px; }
-    .campo.recomendacao textarea { min-height: 84px; resize: vertical; margin: 6px 0; }
-
-    .acoes { margin-top: 18px; }
-    #btnEmail {
-      display: flex; align-items: center; justify-content: center; gap: 10px;
-      width: 100%;
-      background: var(--verde);
-      color: var(--azul);
-      border: 0;
-      border-radius: 12px;
-      padding: 15px 18px;
-      font: inherit; font-weight: 700; font-size: 1rem;
-      cursor: pointer;
-    }
-    #btnEmail:active { transform: translateY(1px); }
-    #btnEmail svg { width: 22px; height: 22px; fill: currentColor; }
-
-    #toast {
-      position: fixed; left: 50%; bottom: 24px;
-      transform: translateX(-50%) translateY(10px);
-      background: var(--verde); color: var(--azul);
-      font-weight: 600; font-size: 0.9rem;
-      padding: 11px 16px; border-radius: 10px;
-      max-width: calc(100% - 40px); text-align: center;
-      opacity: 0; pointer-events: none;
-      transition: opacity .2s, transform .2s;
-    }
-    #toast.visivel { opacity: 1; transform: translateX(-50%) translateY(0); }
-    @media (prefers-reduced-motion: reduce) { #toast { transition: none; } }
-  </style>
-</head>
-<body>
-  <header>
-    <div class="wrap"><h1>Apontamentos DN</h1></div>
-  </header>
-
-  <main class="wrap">
-    <div class="seletores">
-      <div>
-        <label class="sel-label" for="selGcm">GCM</label>
-        <div class="select-box">
-          <select id="selGcm" disabled><option value="">Carregando…</option></select>
-        </div>
-      </div>
-      <div>
-        <label class="sel-label" for="selLoja">Loja</label>
-        <div class="select-box">
-          <select id="selLoja" disabled><option value="">Selecione um GCM primeiro</option></select>
-        </div>
-      </div>
-    </div>
-
-    <p id="estado" role="status"></p>
-
-    <section id="formulario" hidden>
-      <div class="folha">
-        <h2 class="folha-titulo"><span>FORMULÁRIO PARA MANUTENÇÃO DA PARCERIA</span></h2>
-
-        <div class="campo"><label for="fRazao">Razão Social:</label><input id="fRazao" type="text" autocomplete="off"></div>
-        <div class="campo"><label for="fDn">Nº do DN:</label><input id="fDn" type="text" autocomplete="off"></div>
-        <div class="campo"><label for="fCnpj">CNPJ:</label><input id="fCnpj" type="text" autocomplete="off"></div>
-        <div class="campo"><label for="fGcm">GCM:</label><input id="fGcm" type="text" autocomplete="off"></div>
-        <div class="campo">
-          <label for="fTipo">Tipo de parceiros (Lojas ou Concessionárias):</label>
-          <select id="fTipo">
-            <option value="">Selecione</option>
-            <option value="Loja">Loja</option>
-            <option value="Concessionária">Concessionária</option>
-          </select>
-        </div>
-        <div class="campo"><label for="fFundacao">Data de fundação da empresa:</label><input id="fFundacao" type="date"></div>
-        <div class="campo"><label for="fNomeacao">Data da nomeação:</label><input id="fNomeacao" type="text" autocomplete="off"></div>
-        <div class="campo"><label for="fMedia">Média de contratos em quantidade dos últimos 6 meses:</label><input id="fMedia" type="text" autocomplete="off"></div>
-        <div class="campo"><label for="fRestEmpresa">Valor das restrições da empresa:</label><input id="fRestEmpresa" type="text" autocomplete="off"></div>
-        <div class="campo"><label for="fRestSocios">Valor das restrições do(s) sócio(s):</label><input id="fRestSocios" type="text" autocomplete="off"></div>
-        <div class="campo recomendacao"><label for="fRecomendacao">RECOMENDAÇÃO:</label><textarea id="fRecomendacao"></textarea></div>
-      </div>
-
-      <div class="acoes">
-        <button id="btnEmail" type="button">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 5a1 1 0 0 1 1-1h18a1 1 0 0 1 1 1v.4l-10 6.2L2 5.4V5zm0 2.8V19a1 1 0 0 0 1 1h18a1 1 0 0 0 1-1V7.8l-10 6.2L2 7.8z"/></svg>
-          Enviar por e-mail
-        </button>
-      </div>
-    </section>
-  </main>
-
-  <div id="toast" role="status"></div>
-
-  <script>
-    // ================== CONFIGURAÇÃO ==================
-    const SHEET_ID = '152C03-t4XS3w8zNhY5kfNBIl4yxkkvxcfr5yONkik08';
-    const GID = '363972400';   // aba da planilha (número depois de gid= no link)
-    const HEADER_ROWS = 1;     // quantidade de linhas de cabeçalho
-    // Índices das colunas (A = 0, B = 1, C = 2 ...)
-    const COL = {
-      cnpj: 0,          // A
-      dn: 1,            // B
-      gcm: 3,           // D
-      razao: 9,         // J
-      media: 11,        // L
-      restEmpresa: 18,  // S
-      restSocios: 21,   // V
-      nomeacao: 28      // AC
-    };
-    // ===================================================
-
-    const selGcm = document.getElementById('selGcm');
-    const selLoja = document.getElementById('selLoja');
-    const estado = document.getElementById('estado');
-    const formulario = document.getElementById('formulario');
-    const toast = document.getElementById('toast');
-
-    const CAMPOS = [
-      ['Razão Social:', 'fRazao'],
-      ['Nº do DN:', 'fDn'],
-      ['CNPJ:', 'fCnpj'],
-      ['GCM:', 'fGcm'],
-      ['Tipo de parceiros (Lojas ou Concessionárias):', 'fTipo'],
-      ['Data de fundação da empresa:', 'fFundacao'],
-      ['Data da nomeação:', 'fNomeacao'],
-      ['Média de contratos em quantidade dos últimos 6 meses:', 'fMedia'],
-      ['Valor das restrições da empresa:', 'fRestEmpresa'],
-      ['Valor das restrições do(s) sócio(s):', 'fRestSocios'],
-      ['RECOMENDAÇÃO:', 'fRecomendacao']
+    // ---------- Resumo dos apontamentos (só na tela, não vai no e-mail) ----------
+    // [rótulo, campo, classe]  ->  'ref' = vermelho (Refin/Pefin), 'tot' = total
+    const GRUPOS = [
+      { titulo: 'Apontamentos DN', itens: [
+        ['Restrição', 'restricao'],
+        ['Vl. Protesto', 'protesto'],
+        ['Vl. Ações', 'acoes'],
+        ['Vl. Refin', 'refin', 'ref'],
+        ['Vl. Pefin', 'pefin', 'ref'],
+        ['Qtde. Dívidas Vencidas', 'qtdeVencidas'],
+        ['Valor Total DN', 'restEmpresa', 'tot']
+      ]},
+      { titulo: 'Apontamentos Sócio', itens: [
+        ['Sócio Refin', 'socioRefin', 'ref'],
+        ['Sócio Pefin', 'socioPefin', 'ref'],
+        ['Valor Total Sócio', 'restSocios', 'tot']
+      ]},
+      { titulo: 'Totais', itens: [
+        ['Valor Total Refin', 'totalRefin', 'ref'],
+        ['Valor Total Pefin', 'totalPefin', 'ref'],
+        ['Valor Total', 'total', 'tot']
+      ]}
     ];
 
-    let lojas = [];
-    let concluido = false;
-    let timerCarga = null;
-    let timerToast = null;
-
-    function mostrarEstado(msg, erro, detalhe) {
-      estado.className = erro ? 'erro' : '';
-      estado.textContent = msg || '';
-      if (detalhe) {
-        const d = document.createElement('small');
-        d.textContent = detalhe;
-        estado.appendChild(d);
-      }
-    }
-
-    function mostrarToast(msg) {
-      toast.textContent = msg;
-      toast.classList.add('visivel');
-      clearTimeout(timerToast);
-      timerToast = setTimeout(() => toast.classList.remove('visivel'), 3800);
-    }
-
-    // ---------- Leitura da planilha (JSONP do Google Visualization) ----------
-    function falhaCarga() {
-      if (concluido) return;
-      concluido = true;
-      clearTimeout(timerCarga);
-      selGcm.innerHTML = '<option value="">Não foi possível carregar</option>';
-      mostrarEstado(
-        'Não consegui ler a planilha.',
-        true,
-        'Confira se a planilha está compartilhada como "Qualquer pessoa com o link → Leitor" e se o GID está correto.'
-      );
-    }
-
-    function celula(c, idx) {
-      const cel = c && c[idx];
-      if (!cel) return '';
-      const v = (cel.f !== undefined && cel.f !== null) ? cel.f : cel.v;
-      return (v === null || v === undefined) ? '' : String(v).trim();
-    }
-
-    window.__respostaPlanilha = function (resp) {
-      if (concluido) return;
-      if (!resp || resp.status !== 'ok' || !resp.table) { falhaCarga(); return; }
-      concluido = true;
-      clearTimeout(timerCarga);
-
-      lojas = resp.table.rows
-        .map(r => ({
-          cnpj: celula(r.c, COL.cnpj),
-          dn: celula(r.c, COL.dn),
-          gcm: celula(r.c, COL.gcm),
-          razao: celula(r.c, COL.razao),
-          media: celula(r.c, COL.media),
-          restEmpresa: celula(r.c, COL.restEmpresa),
-          restSocios: celula(r.c, COL.restSocios),
-          nomeacao: celula(r.c, COL.nomeacao)
-        }))
-        .filter(l => l.gcm && l.razao);
-
-      const gcms = Array.from(new Set(lojas.map(l => l.gcm)))
-        .sort((a, b) => a.localeCompare(b, 'pt-BR'));
-
-      selGcm.innerHTML = '<option value="">Selecione um GCM</option>';
-      gcms.forEach(g => {
-        const o = document.createElement('option');
-        o.value = g; o.textContent = g;
-        selGcm.appendChild(o);
+    function renderResumo(l) {
+      const box = document.getElementById('resumo');
+      box.innerHTML = '';
+      GRUPOS.forEach(g => {
+        const card = document.createElement('div');
+        card.className = 'resumo-card';
+        const h = document.createElement('h3');
+        h.textContent = g.titulo;
+        card.appendChild(h);
+        const dl = document.createElement('dl');
+        g.itens.forEach(([rotulo, campo, cls]) => {
+          const linha = document.createElement('div');
+          if (cls) linha.className = cls;
+          const dt = document.createElement('dt');
+          dt.textContent = rotulo;
+          const dd = document.createElement('dd');
+          dd.textContent = l[campo] || '—';
+          linha.appendChild(dt);
+          linha.appendChild(dd);
+          dl.appendChild(linha);
+        });
+        card.appendChild(dl);
+        box.appendChild(card);
       });
-      selGcm.disabled = false;
-      mostrarEstado(gcms.length ? '' : 'Nenhum GCM encontrado na coluna D da planilha.');
-    };
-
-    function carregarPlanilha() {
-      const url = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID +
-        '/gviz/tq?gid=' + GID + '&headers=' + HEADER_ROWS +
-        '&tqx=out:json;responseHandler:__respostaPlanilha';
-      const s = document.createElement('script');
-      s.src = url;
-      s.onerror = falhaCarga;
-      document.head.appendChild(s);
-      timerCarga = setTimeout(falhaCarga, 15000);
     }
-    window.addEventListener('error', e => {
-      if (e.filename && e.filename.indexOf('docs.google.com') !== -1) falhaCarga();
-    });
-
-    // ---------- Seleção de GCM e Loja ----------
-    selGcm.addEventListener('change', () => {
-      formulario.hidden = true;
-      const gcm = selGcm.value;
-      selLoja.innerHTML = '';
-      if (!gcm) {
-        selLoja.innerHTML = '<option value="">Selecione um GCM primeiro</option>';
-        selLoja.disabled = true;
-        return;
-      }
-      const doGcm = lojas
-        .map((l, i) => ({ l, i }))
-        .filter(x => x.l.gcm === gcm)
-        .sort((a, b) => a.l.razao.localeCompare(b.l.razao, 'pt-BR'));
-
-      const cont = {};
-      doGcm.forEach(x => { cont[x.l.razao] = (cont[x.l.razao] || 0) + 1; });
-
-      const ph = document.createElement('option');
-      ph.value = ''; ph.textContent = 'Selecione a loja (' + doGcm.length + ')';
-      selLoja.appendChild(ph);
-      doGcm.forEach(x => {
-        const o = document.createElement('option');
-        o.value = String(x.i);
-        o.textContent = cont[x.l.razao] > 1 && x.l.cnpj ? x.l.razao + ' – ' + x.l.cnpj : x.l.razao;
-        selLoja.appendChild(o);
-      });
-      selLoja.disabled = false;
-    });
-
-    selLoja.addEventListener('change', () => {
-      if (selLoja.value === '') { formulario.hidden = true; return; }
-      preencher(lojas[Number(selLoja.value)]);
-    });
 
     function set(id, valor) { document.getElementById(id).value = valor || ''; }
 
@@ -889,6 +475,7 @@
       set('fRestEmpresa', l.restEmpresa);
       set('fRestSocios', l.restSocios);
       set('fRecomendacao', '');
+      renderResumo(l);
       formulario.hidden = false;
       formulario.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
