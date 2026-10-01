@@ -445,7 +445,8 @@
       const razao = document.getElementById('fRazao').value.trim();
       const ok = await copiarHtml(montarHtml(), montarTextoPlano());
 
-      const assunto = 'Parecer – Apontamentos restritivos' + (razao ? ' – ' + razao : '');
+      const dn = document.getElementById('fDn').value.trim();
+      const assunto = 'MONITORAMENTO SERASA - REGIONAL | DN ' + dn + ' | ' + razao;
       const corpo = 'Prezado Gestor,\n\nSegue abaixo o parecer sobre a loja com apontamentos restritivos.\n\n';
       window.location.href = 'mailto:?subject=' + encodeURIComponent(assunto) +
                              '&body=' + encodeURIComponent(corpo);
