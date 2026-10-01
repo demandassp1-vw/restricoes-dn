@@ -113,7 +113,7 @@
     .campo.recomendacao textarea { min-height: 84px; resize: vertical; margin: 6px 0; }
 
     .acoes { margin-top: 18px; }
-    #btnWhats {
+    #btnEmail {
       display: flex; align-items: center; justify-content: center; gap: 10px;
       width: 100%;
       background: var(--verde);
@@ -124,8 +124,8 @@
       font: inherit; font-weight: 700; font-size: 1rem;
       cursor: pointer;
     }
-    #btnWhats:active { transform: translateY(1px); }
-    #btnWhats svg { width: 22px; height: 22px; fill: currentColor; }
+    #btnEmail:active { transform: translateY(1px); }
+    #btnEmail svg { width: 22px; height: 22px; fill: currentColor; }
 
     #toast {
       position: fixed; left: 50%; bottom: 24px;
@@ -189,9 +189,9 @@
       </div>
 
       <div class="acoes">
-        <button id="btnWhats" type="button">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 3h16a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H9l-5 4v-4H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/></svg>
-          Compartilhar no WhatsApp
+        <button id="btnEmail" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 5a1 1 0 0 1 1-1h18a1 1 0 0 1 1 1v.4l-10 6.2L2 5.4V5zm0 2.8V19a1 1 0 0 0 1 1h18a1 1 0 0 0 1-1V7.8l-10 6.2L2 7.8z"/></svg>
+          Enviar por e-mail
         </button>
       </div>
     </section>
@@ -378,7 +378,12 @@
       formulario.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
-    // ---------- WhatsApp ----------
+    // ---------- E-mail ----------
+    function esc(t) {
+      return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
     function valorCampo(id) {
       const v = document.getElementById(id).value.trim();
       if (id === 'fFundacao' && v) {
@@ -388,39 +393,66 @@
       return v || '—';
     }
 
-    function montarTexto() {
-      const linhas = ['*FORMULÁRIO PARA MANUTENÇÃO DA PARCERIA*', ''];
+    // Tabela em HTML com estilos inline (compatível com Outlook, Gmail etc.)
+    function montarHtml() {
+      const cel = 'border:1px solid #000000;padding:12px 14px;font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#000000;';
+      let h = '<table cellpadding="0" cellspacing="0" style="border-collapse:collapse;width:100%;max-width:650px;border:1px solid #000000;">';
+      h += '<tr><td style="' + cel + 'text-align:center;font-weight:bold;text-decoration:underline;">FORMULÁRIO PARA MANUTENÇÃO DA PARCERIA</td></tr>';
       CAMPOS.forEach(([rotulo, id]) => {
-        linhas.push('*' + rotulo + '* ' + valorCampo(id));
+        h += '<tr><td style="' + cel + '"><b>' + esc(rotulo) + '</b> ' +
+             esc(valorCampo(id)).replace(/\n/g, '<br>') + '</td></tr>';
       });
+      return h + '</table>';
+    }
+
+    function montarTextoPlano() {
+      const linhas = ['FORMULÁRIO PARA MANUTENÇÃO DA PARCERIA', ''];
+      CAMPOS.forEach(([rotulo, id]) => linhas.push(rotulo + ' ' + valorCampo(id)));
       return linhas.join('\n');
     }
 
-    async function copiar(texto) {
+    async function copiarHtml(html, texto) {
       try {
-        await navigator.clipboard.writeText(texto);
-        return true;
-      } catch (e) {
-        const ta = document.createElement('textarea');
-        ta.value = texto;
-        ta.style.position = 'fixed'; ta.style.opacity = '0';
-        document.body.appendChild(ta);
-        ta.select();
-        let ok = false;
-        try { ok = document.execCommand('copy'); } catch (_) {}
-        ta.remove();
-        return ok;
-      }
+        if (window.ClipboardItem && navigator.clipboard && navigator.clipboard.write) {
+          await navigator.clipboard.write([new ClipboardItem({
+            'text/html': new Blob([html], { type: 'text/html' }),
+            'text/plain': new Blob([texto], { type: 'text/plain' })
+          })]);
+          return true;
+        }
+      } catch (e) { /* cai no plano B */ }
+
+      // Plano B: seleciona a tabela renderizada e copia
+      const box = document.createElement('div');
+      box.innerHTML = html;
+      box.style.position = 'fixed';
+      box.style.left = '-9999px';
+      box.style.top = '0';
+      document.body.appendChild(box);
+      const range = document.createRange();
+      range.selectNodeContents(box);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+      let ok = false;
+      try { ok = document.execCommand('copy'); } catch (_) {}
+      sel.removeAllRanges();
+      box.remove();
+      return ok;
     }
 
-    document.getElementById('btnWhats').addEventListener('click', async () => {
-      const texto = montarTexto();
-      const copiando = copiar(texto);
-      window.open('https://wa.me/?text=' + encodeURIComponent(texto), '_blank');
-      const ok = await copiando;
+    document.getElementById('btnEmail').addEventListener('click', async () => {
+      const razao = document.getElementById('fRazao').value.trim();
+      const ok = await copiarHtml(montarHtml(), montarTextoPlano());
+
+      const assunto = 'Parecer – Apontamentos restritivos' + (razao ? ' – ' + razao : '');
+      const corpo = 'Prezado Gestor,\n\nSegue abaixo o parecer sobre a loja com apontamentos restritivos.\n\n';
+      window.location.href = 'mailto:?subject=' + encodeURIComponent(assunto) +
+                             '&body=' + encodeURIComponent(corpo);
+
       mostrarToast(ok
-        ? 'Copiado! Escolha o contato no WhatsApp e cole a mensagem.'
-        : 'Escolha o contato no WhatsApp. A mensagem já vai preenchida.');
+        ? 'Tabela copiada! No e-mail que abriu, cole (Ctrl+V) abaixo do texto.'
+        : 'Não consegui copiar a tabela automaticamente. Tente novamente.');
     });
 
     carregarPlanilha();
